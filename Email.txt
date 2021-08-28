@@ -1,0 +1,127 @@
+Call fn_KillBrowser()
+
+Call fn_KillExcelProcess()	
+
+ Dim DataXL,WB,WS
+ 'To read values from excel
+ 	Set DataXL= createobject("Excel.Application")
+	Set WB = DataXL.Workbooks.Open ("C:\Users\mvarshinir\Desktop\Execution Results\TestAutomation\EmailTest.xlsx")
+	Set WS = WB.Sheets("Email")
+	
+	ColRange = WS.usedrange.columns.count
+	print ColRange
+	
+	For icol = 1 To ColRange Step 1
+		ColHeader = WS.cells(1,icol)
+		If Trim(ColHeader) = Trim("UserName") Then
+			Username = WS.cells(2,icol).value
+		End If
+		If Trim(ColHeader) = Trim("Password") Then
+			Password = WS.cells(2,icol).value
+		End If
+		If Trim(ColHeader) = Trim("Subject") Then
+			Subject = WS.cells(2,icol).value
+		End If
+		If Trim(ColHeader) = Trim("Body") Then
+			Body = WS.cells(2,icol).value
+		End If	
+	Next
+	print Username
+	Wait 5
+
+Call fn_Login()
+
+Call fn_Emailverification()	
+
+Call fn_SignOut()	
+	
+
+Set WS = Nothing
+Set WB = Nothing
+Set DataXL = Nothing
+
+
+Public Function fn_KillBrowser()
+	'To close all pre existing browsers opened
+	If Browser("CreationTime:=0").Exist then
+		browser("creationtime:=0").Quit
+	end if
+End Function
+
+Public Function fn_SignOut()
+	Set SignOutobj = Browser("CreationTime:=0").page("hwnd:=0")
+		With SignOutobj
+			.Image("xpath:=//img[@class='gb_Ca gbii']").Click
+			Wait 2
+			.Link("text:=Sign out").Click
+			Wait 2
+		End With
+End Function
+		
+Public Function fn_KillExcelProcess()
+	Dim objWMIService,colProcess,objProcess
+	'To kill all pre existing excel process in task manager
+	Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}" & "!\\.\root\cimv2")
+	Set colProcess = objWMIService.ExecQuery ("Select * From Win32_Process WHERE Name='excel.exe'")
+	For Each objProcess in colProcess
+		objProcess.Terminate()
+		print "Process "& objProcess.Name	
+	Next
+End Function
+
+ Public Function fn_Login()
+ 		
+ 	systemutil.Run "CHROME.EXE","www.gmail.com"
+	
+	Set BrwObj = Browser("name:=Gmail").page("title:=Gmail")
+	Wait 10
+	With BrwObj
+		.WebEdit("acc_name:=Email or phone").Set(Username)
+		.WebButton("innertext:=Next").Click
+		Wait 1
+		If .WebButton("innertext:=More ways to sign in").Exist Then
+			.WebButton("innertext:=More ways to sign in").Click
+			wait 1
+		End If
+		If .Link("innertext:=Enter your password.*").Exist Then
+			.Link("innertext:=Enter your password.*").Click
+		End If
+		Wait 2
+		.WebEdit("name:=password").Set(Password)
+		.WebButton("innertext:=Next").Click
+		Wait 5
+	End  With
+	
+ End Function
+ 
+ Public Function fn_Emailverification()
+ 'To Verify the Email Subject and body
+ 	Set tblObj = Browser("CreationTime:=0").page("title:=Inbox.*").WebTable("xpath:=//DIV[3]/DIV[1]/TABLE[@role='grid'][1]")
+	irow = tblObj.GetROProperty("rows")
+	For a = 1 To irow Step 1
+		Set ChdObj = tblObj.ChildItem(a,4,"WebElement",0)
+		EmailVer = ChdObj.GetROProperty("innertext")
+		'print EmailVer
+			If Instr(EmailVer,Subject)>0 Then
+				Reporter.ReportEvent micPass, "Subject", "Email Subject is found"
+				Print "Test is Passed and subject of the email is " &Subject
+				ChdObj.Click
+				Wait 3
+				Set Opentbl = Browser("opentitle:=Gmail").page("hwnd:=0").WebTable("xpath:=//DIV[1]/DIV[1]/DIV[@role='main'][1]/DIV[1]/TABLE[@role='presentation']")
+				VBody = Opentbl.GetROProperty("innertext")
+				If Instr(VBody,Body)>0 Then
+					Reporter.ReportEvent micPass, "Body", "Email Body is found"
+					Print "Test is Passed and Body of the email is " &Body
+				End  If
+			End If	
+			If Err.Description <> "" Then
+				stepErrDescription = " Test is failed due to error :" & Err.Description
+				Exit For
+			End  If				
+		Next
+		
+ End Function
+ 
+
+ 
+	
